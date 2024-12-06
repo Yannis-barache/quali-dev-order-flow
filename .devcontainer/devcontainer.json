@@ -1,0 +1,29 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+  "name": "org.openrichmedia.devcontainers/quali-dev-order-flow-dev:0824",
+  "service": "dev",
+  "dockerComposeFile": "docker-compose.yml",
+  "workspaceFolder": "/root/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "nrwl.angular-console",
+        "esbenp.prettier-vscode",
+        "vscjava.vscode-gradle",
+        "vscjava.vscode-java-debug",
+        "mongodb.mongodb-vscode",
+        "jebbs.plantuml",
+        "redhat.java",
+        "VisualStudioExptTeam.vscodeintellicode",
+        "vscjava.vscode-java-dependency",
+        "vscjava.vscode-java-test",
+        "ms-vscode.live-server",
+        "redhat.vscode-quarkus",
+        "contextmapper.context-mapper-vscode-extension"
+      ]
+    }
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh/id_rsa,target=/root/.ssh/id_rsa,type=bind,consistency=cached"
+  ]
+}

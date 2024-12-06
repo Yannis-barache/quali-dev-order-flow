@@ -1,0 +1,940 @@
+import "domain.cml"
+
+ContextMap {
+  type = SYSTEM_LANDSCAPE
+  state = AS_IS
+
+  // Core contexts
+  contains CustomerManagementContext
+  contains OrderProcessingContext
+  contains CartManagementContext
+  
+  // Support contexts
+  contains EventSourcingContext
+  contains ProductCatalogManagementContext
+  contains ProductRegistryManagementContext
+  contains StockManagementContext
+
+  // Generic contexts
+  contains MoneyContext
+  
+  // CustomerManagementContext links
+  EventSourcingContext [U,OHS,PL]->[D,CF] CustomerManagementContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  CustomerManagementContext [U,OHS,PL]->[D,CF] OrderProcessingContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  CustomerManagementContext [U,OHS,PL]->[D,CF] CartManagementContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+
+  // ProductManagementContext links
+  EventSourcingContext [U,OHS,PL]->[D,CF] ProductRegistryManagementContext {
+    implementationTechnology = "Java library + MongoDB database"
+  }
+  EventSourcingContext [U,OHS,PL]->[D,CF] ProductCatalogManagementContext {
+    implementationTechnology = "Java library + MongoDB database"
+  }
+  ProductRegistryManagementContext [U,OHS,PL]->[D,CF] ProductCatalogManagementContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  ProductRegistryManagementContext [U,OHS,PL]->[D,CF] StockManagementContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  ProductRegistryManagementContext [U,OHS,PL]->[D,CF] OrderProcessingContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  ProductRegistryManagementContext [U,OHS,PL]->[D,CF] CartManagementContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  ProductCatalogManagementContext [SK]<->[SK] MoneyContext {
+    implementationTechnology = "Java library"
+  }
+
+  // StockManagementContext links
+  EventSourcingContext [U,OHS,PL]->[D,CF] StockManagementContext {
+    implementationTechnology = "Java library + MongoDB database"
+  }
+  StockManagementContext [U,OHS,PL]->[D,CF] CartManagementContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+  StockManagementContext [U,OHS,PL]->[D,CF] OrderProcessingContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+
+  // CartManagementContext links
+  EventSourcingContext [U,OHS,PL]->[D,CF] CartManagementContext {
+    implementationTechnology = "Java library + MongoDB database"
+  }
+  CartManagementContext [U,OHS,PL]->[D,CF] OrderProcessingContext {
+    implementationTechnology = "Pulsar Messaging"
+  }
+
+  // OrderProcessingContext links
+  EventSourcingContext [U,OHS,PL]->[D,CF] OrderProcessingContext {
+    implementationTechnology = "Java library + MongoDB database"
+  }
+}
+
+// region Core
+
+BoundedContext OrderProcessingContext implements OrderProcessingDomain {
+  type = SYSTEM
+
+  Application OrderProcessingApp {
+    Service OrderService {
+      
+    }
+
+    abstract Command OrderServiceCommand {
+    }
+
+    Command PlaceOrder extends OrderServiceCommand {
+    }
+  }
+
+  Aggregate Orders {
+    responsibilities = "Orders", "OrderItems"
+
+    Entity Order {
+      aggregateRoot
+      - OrderId orderId
+      - CustomerId customerId
+      - List<OrderItem> items
+    }
+
+    ValueObject OrderId {
+      String id
+    }
+
+    Entity OrderItem {
+      - ProductId productId
+      - StockItemId stockId
+      int quantity
+    }
+  }
+}
+
+BoundedContext CartManagementContext implements ShoppingCartDomain {
+  type = FEATURE
+
+  Application CartManagementApp {
+    Service CartService {
+      
+    }
+
+    abstract Command CartServiceCommand {
+    }
+
+    Command CreateCart extends CartServiceCommand {
+    }
+  }
+
+  Aggregate Carts {
+    responsibilities = "Carts", "CartItems"
+
+    Entity Cart {
+      aggregateRoot
+      - CartId cartId
+      - CustomerId customerId
+      - List<CartItem> items
+    }
+
+    ValueObject CartId {
+      String id
+    }
+
+    Entity CartItem {
+      - ProductId productId
+      - StockItemId stockId
+      int quantity
+    }
+  }
+}
+
+// region Customer Management
+
+BoundedContext CustomerManagementContext implements CustomerDomain {
+  type = FEATURE
+
+  Application CustomerManagementApp {
+    Service CustomerService {
+      
+    }
+
+    abstract Command CustomerServiceCommand {
+    }
+
+    Command RegisterCustomer extends CustomerServiceCommand {
+      String firstname
+      String lastname
+    }
+  }
+
+  Aggregate Customers {
+    responsibilities = "Customers", "CustomerAddresses", "CustomerContacts"
+
+    Entity Customer {
+      aggregateRoot
+      - CustomerId customerId
+      String firstname
+      String lastname
+      - List<CustomerContact> contacts
+      - List<CustomerAddress> addresses
+    }
+
+    Entity ActiveCustomer extends Customer {
+      - CustomerStates customerState
+      // state = ACTIVE
+    }
+
+    Entity InactiveCustomer extends Customer {
+      - CustomerStates customerState
+      // state = INACTIVE
+    }
+
+    ValueObject CustomerId {
+      String id
+    }
+
+    ValueObject CustomerAddress {
+      String number
+      String street
+      String city
+      String zipCode
+      String country
+    }
+
+    enum CustomerContactType {
+      EMAIL,
+      PHONE
+    }
+
+    abstract ValueObject CustomerContact {
+      - CustomerContactType contactType
+      String value
+    }
+
+    ValueObject EmailCustomerContact extends CustomerContact {
+      immutable - CustomerContactType contactType
+      // contactType = EMAIL
+    }
+
+    ValueObject PhoneCustomerContact extends CustomerContact {
+      immutable - CustomerContactType contactType
+      // contactType = PHONE
+    }
+
+    enum CustomerStates {
+      aggregateLifecycle
+      ACTIVE,
+      INACTIVE
+    }
+
+    // Commands and Events
+
+    abstract Command CustomerCommand {
+      - CustomerId customerId
+    }
+
+    Command UpdateFirstname extends CustomerCommand {
+      String firstname
+    }
+
+    Command UpdateLastname extends CustomerCommand {
+      String lastname
+    }
+
+    Command AddAddress extends CustomerCommand {
+      - CustomerAddress address
+    }
+
+    Command RemoveAddress extends CustomerCommand {
+      - CustomerAddress address
+    }
+
+    Command AddContact extends CustomerCommand {
+      - CustomerContact contact
+    }
+
+    Command RemoveContact extends CustomerCommand {
+      - CustomerContact contact
+    }
+
+    abstract Event CustomerEvent extends EventBase {
+      - CustomerId customerId
+    }
+
+    Event CustomerRegistered extends CustomerEvent {
+      String firstname
+      String lastname
+    }
+  }
+}
+
+// TODO: (Bonus) implement this!
+BoundedContext CustomerNotificationContext implements CustomerNotificationDomain {
+  type = FEATURE
+
+  Aggregate Notifications {
+    responsibilities = "Notifications"
+
+    Entity Notification {
+      aggregateRoot
+      - NotificationId notificationId
+      - List<NotificationContent> notificationContent
+    }
+
+    ValueObject NotificationId {
+      String id
+    }
+
+    ValueObject NotificationContent {
+      String title
+      String message
+    }
+
+    enum NotificationStates {
+      aggregateLifecycle
+      PENDING,
+      SENT,
+      FAILED
+    }
+
+    // abstract DomainEvent NotificationEvent {
+    //   - NotificationId notificationId
+    // }
+  }
+}
+
+// endregion Customer Management
+
+// endregion Core
+
+// region Support
+
+BoundedContext EventSourcingContext implements EventSourcingDomain {
+  type = SYSTEM
+
+  Module EventSourcingModule {
+    basePackage = org.openrichmedia.priv.thibaudfaurie.orderflow.shared.eventsourcing
+
+    Aggregate Events {
+      responsibilities =
+      "Events", "Event identification", "Event timestamp", "Aggregate Versioning", "Event stereotyping"
+
+      DomainEvent EventBase {
+        aggregateRoot
+        - EventId id
+        String aggregateId
+        long version
+        long timestamp
+        String eventType
+      }
+
+      ValueObject EventId {
+        String id
+      }
+    }
+  }
+
+  // Module BehaviorModule {
+  //   basePackage = org.openrichmedia.priv.thibaudfaurie.orderflow.shared.eventsourcing.behavior
+
+  //   Aggregate Behaviors {
+  //     responsibilities =
+  //     "Event handling and aggregate state management"
+
+  //     Trait Behavior {
+  //       def void apply(T aggregate, E processedEvent);
+  //     }
+  //   }
+
+  //   Aggregate CommandHandlers {
+  //     responsibilities =
+  //     "Command handling"
+
+  //     Trait CommandHandler {
+  //       def void handle(T aggregate, Com processedCommand);
+  //     }
+  //   }
+  // }
+
+  Module StoreModule {
+    basePackage = org.openrichmedia.priv.thibaudfaurie.orderflow.shared.eventsourcing.store
+
+    Aggregate Stores {
+      responsibilities =
+      "Event store", "Event retrieval", "Event persistence"
+
+      Trait EventStore {
+        def void saveEvents(List<@EventBase> events);
+        def List<@EventBase> findEventsByAggregateRootId(String aggregateRootId);
+      }
+    }
+  } 
+}
+
+BoundedContext StockManagementContext implements StockDomain {
+  type = FEATURE
+  responsibilities = "Stock management"
+
+  Application StockManagementApp {
+    Service StockService {
+      public @Stock getStock(); 
+    }
+    Service StockCommandConsumer {
+      public void handleCommand(@StockCommand cmd);
+    }
+    Service StockQueryConsumer {
+      public void handleQuery(@StockQuery qry);
+      
+    }
+    Service StockProjector {
+      public void handleEvent(@StockEvent evt);
+      
+    }
+
+    // Queries
+
+    abstract Command StockQuery {
+    }
+
+    Command GetStockItemById extends @StockQuery {
+      - StockItemId stockId
+    }
+
+    Command GetStockItems extends @StockQuery {
+    }
+
+    Flow StockFlow {
+      command AddStockItem emits event StockItemAdded
+      command RemoveStockItem emits event StockItemRemoved
+      command BookStockItem emits event StockItemBooked
+      command ReleaseStockItem emits event StockItemReleased
+    }
+  }
+
+  Aggregate Stock {
+    responsibilities = "Stocks", "StockItems"
+
+    Entity Stock {
+      aggregateRoot
+      - List<StockItem> items
+    }
+
+    Entity StockItem {
+      - ProductId productId
+      - StockItemId stockId
+      int quantity
+    }
+
+    ValueObject StockItemId {
+      String id
+    }
+
+    // Commands
+
+    abstract Command StockCommand {
+    }
+
+    Command AddStockItem extends @StockCommand {
+      - ProductId productId
+      - List<StockItemDTO> items
+    }
+
+    Command RemoveStockItem extends @StockCommand {
+      - StockItemId stockId
+    }
+
+    Command BookStockItem extends @StockCommand {
+      - ProductId productId
+      int quantity
+    }
+
+    Command ReleaseStockItem extends @StockCommand {
+      - List<StockItemId> stockIds
+    }
+
+    Command WithdrawStockItem extends @StockCommand {
+      - StockItemId stockId
+    }
+
+    // Events
+
+    abstract DomainEvent StockEvent extends @EventBase {
+    }
+
+    DomainEvent StockItemAdded extends @StockEvent {
+      - StockItemId stockId
+      - ProductId productId
+    }
+
+    DomainEvent StockItemRemoved extends @StockEvent {
+      - StockItemId stockId
+    }
+
+    DomainEvent StockItemBooked extends @StockEvent {
+      - StockItemId stockId
+    }
+
+    DomainEvent StockItemReleased extends @StockEvent {
+      - StockItemId stockId
+    }
+  }
+
+  Aggregate StockReadModel {
+    Entity StockItemView {
+      - ProductId productId
+      - StockItemId stockId
+      Timestamp lastUpdated
+      - StockItemStates itemState
+    }
+
+    enum StockItemStates {
+      AVAILABLE,
+      BOOKED
+    }
+
+    DataTransferObject StockItemDTO {
+      String productId
+      String stockId
+      String itemState
+    }
+
+    DataTransferObject StockDTO {
+      Timestamp lastUpdated
+      - List<@StockItemDTO> items
+    }
+
+    Service StockQueryService {
+      public List<@StockItemView> getStockItems();
+      public @StockItemView getStockItemById(@StockItemId stockId);
+    }
+  }
+}
+
+// region Product Management
+
+BoundedContext ProductRegistryManagementContext implements ProductRegistryDomain {
+  type = SYSTEM
+
+  Application {
+    Flow ProductRegistryFlow {
+      command RegisterProduct emits event ProductRegistered
+      command UpdateProduct emits event ProductUpdated
+      command RemoveProduct emits event ProductRemoved
+    }
+  }
+
+  Aggregate ProductRegistry {
+    responsibilities = "Products"
+
+    Entity ProductRegistry {
+      aggregateRoot
+      - private List<Product> products
+      def public void handle(@ProductRegistryCommand cmd);
+      def public void apply(@ProductRegistryEvent evt);
+      def public boolean hasProduct();
+
+      Repository ProductRegistryRepository {
+        private @EventStore eventStore;
+        @ProductRegistry load();
+        void save(@ProductRegistry registry);
+      }
+    }
+
+    Entity Product {
+      - ProductId productId
+      String name
+      String productDescription
+    }
+
+    ValueObject ProductId {
+      String id
+    }
+
+    // Resources
+    Resource ProductRegistryCommandResource {
+      path = "/productRegistry"
+      public registerProduct(@RegisterProduct cmd) POST path="/registerProduct";
+      public updateProduct(@UpdateProduct cmd) POST path="/updateProduct";
+      public removeProduct(@RemoveProduct cmd) POST path="/removeProduct";
+    }
+
+    // Services
+    Service ProductRegistryService {
+      public @ProductRegistered registerProduct(@ProductRegistry registry, @RegisterProduct cmd);
+      public @ProductUpdated updateProduct(@ProductRegistry registry, @UpdateProduct cmd);
+      public @ProductRemoved removeProduct(@ProductRegistry registry, @RemoveProduct cmd);
+    }
+
+    Service ProductRegistryCommandConsumer {
+      public void handleCommand(@ProductRegistryCommand cmd);
+    }
+
+    Service ProductRegistryEventEmitter {
+      public void emit(@ProductRegistryEvent evt);
+      private void emitRegisteredProduct(@ProductRegistered evt);
+      private void emitUpdatedProduct(@ProductUpdated evt);
+      private void emitRemovedProduct(@ProductRemoved evt);
+    }
+
+    // Commands
+
+    abstract Command ProductRegistryCommand {
+    }
+
+    Command RegisterProduct extends @ProductRegistryCommand {
+      String name
+      String productDescription
+    }
+
+    Command UpdateProduct extends @ProductRegistryCommand {
+      - ProductId productId
+      String name
+      String productDescription
+    }
+
+    Command RemoveProduct extends @ProductRegistryCommand {
+      - ProductId productId
+    }
+
+    // Events
+
+    abstract DomainEvent ProductRegistryEvent extends @EventBase {
+    }
+
+    DomainEvent ProductRegistered extends @ProductRegistryEvent {
+      - ProductId productId
+      String name
+      String productDescription
+    }
+
+    abstract DomainEvent ProductCentricEvent extends @ProductRegistryEvent {
+      - ProductId productId
+    }
+
+    DomainEvent ProductUpdated extends @ProductCentricEvent {
+      String name
+      String productDescription
+    }
+
+    DomainEvent ProductRemoved extends @ProductCentricEvent {
+    }
+  }
+
+  Aggregate ProductRegistryReadModel {
+
+    Entity ProductEntity {
+      - ProductId productId
+      String name
+      String productDescription
+    }
+
+    // Resources
+    Resource ProductRegistryQueryResource {
+      public @RegistryProductDto getProduct(@ProductId productId) GET path="/products/{productId}";
+      public List<@RegistryProductDto> getAllProducts() GET path="/products";
+    }
+
+    // Services
+    Service ProductQueryConsumer {
+      public void handleQuery(@ProductQuery qry);
+      public void getProductById(@ProductId productId);
+      public void getAllProducts();
+    }
+
+    Service ProductService {
+      public @ProductEntity getProductById(@ProductId productId);
+      public List<@ProductEntity> getAllProducts();
+    }
+
+    Service ProductRegistryEventConsumer {
+      public void handleEvent(@ProductRegistryEvent evt);
+    }
+
+    Service ProductRegistryProjector {
+      public void handleEvent(@ProductRegistryEvent evt);
+      private void projectRegisteredProduct(@ProductRegistered evt);
+      private void projectUpdatedProduct(@ProductUpdated evt);
+      private void projectRemovedProduct(@ProductRemoved evt);
+    }
+
+    // Data Transfer Objects
+
+    DataTransferObject RegistryProductDto {
+      String id
+      String name
+      String productDescription
+      Long updatedAt
+      Long registeredAt
+    }
+
+    // Queries
+
+    abstract Command ProductQuery {
+    }
+
+    Command GetProducts extends @ProductQuery {
+    }
+
+    Command GetProductById extends @ProductQuery {
+      - ProductId productId
+    }
+  }
+}
+
+BoundedContext ProductCatalogManagementContext implements ProductCatalogDomain {
+  type = SYSTEM
+  implementationTechnology = "Java, Quarkus application, MongoDB database, Pulsar messaging"
+
+  Application {
+    Flow ProductCatalogFlow {
+      command AddCatalogItem emits event CatalogItemAdded
+      command UpdateCatalogItem emits event CatalogItemUpdated
+      event CatalogItemUpdated triggers command DeactivateCatalogItem
+      command RemoveCatalogItem emits event CatalogItemRemoved
+      command ActivateCatalogItem emits event CatalogItemActivated
+      command DeactivateCatalogItem emits event CatalogItemDeactivated
+    }
+  }
+
+  Aggregate ProductCatalog {
+    responsibilities = "ProductCatalogs"
+
+    Entity ProductCatalog {
+      aggregateRoot
+      - ProductCatalogId productId
+      String label
+      String catalogDescription
+      - List<CatalogItem> catalogItems
+    }
+
+    ValueObject ProductCatalogId {
+      String id
+    }
+
+    abstract Entity CatalogItem {
+      - CatalogItemId catalogItemId
+      - ProductId productId
+      - CatalogItemStates itemState
+      String label
+      String itemDescription
+      - Price price
+    }
+
+    Entity CreatedCatalogItem extends CatalogItem {
+      - CatalogItemStates itemState
+      // state = CREATED
+    }
+
+    Entity ActiveCatalogItem extends CatalogItem {
+      - CatalogItemStates itemState
+      // state = ACTIVE
+    }
+
+    Entity InactiveCatalogItem extends CatalogItem {
+      - CatalogItemStates itemState
+      // state = INACTIVE
+    }
+
+    ValueObject CatalogItemId {
+      String id
+    }
+
+    // States
+    enum CatalogItemStates {
+      CREATED,
+      ACTIVE,
+      INACTIVE
+    }
+
+    // Resources
+    Resource ProductCatalogCommandResource {
+      public createCatalog(@CreateCatalog cmd) POST path="/createCatalog";
+      public addCatalogItem(@AddCatalogItem cmd) POST path="/addCatalogItem";
+      public updateCatalogItem(@UpdateCatalogItem cmd) POST path="/updateCatalogItem";
+      public activateCatalogItem(@ActivateCatalogItem cmd) POST path="/activateCatalogItem";
+      public deactivateCatalogItem(@DeactivateCatalogItem cmd) POST path="/deactivateCatalogItem";
+      public removeCatalogItem(@RemoveCatalogItem cmd) POST path="/removeCatalogItem";      
+    }
+
+    // Services
+    Service ProductCatalogService {
+      public void createCatalog(@CreateCatalog cmd);
+      public @ProductCatalog getCatalog(@ProductCatalogId catalogId);
+    }
+
+    Service ProductCatalogCommandConsumer {
+      public void handleCommand(@ProductCatalogCommand cmd);
+    }
+
+    Service ProductCatalogProjector {
+      public void handleEvent(@ProductCatalogEvent evt);
+      private void projectAddedCatalogItem(@CatalogItemAdded evt);
+      private void projectUpdatedCatalogItem(@CatalogItemUpdated evt);
+      private void projectActivatedCatalogItem(@CatalogItemActivated evt);
+      private void projectDeactivatedCatalogItem(@CatalogItemDeactivated evt);
+      private void projectRemovedCatalogItem(@CatalogItemRemoved evt);
+    }
+
+    // Commands
+    abstract Command ProductCatalogCommand {
+    }
+
+    Command CreateCatalog extends @ProductCatalogCommand {
+      String label
+      String catalogDescription
+    }
+
+    Command AddCatalogItem extends @ProductCatalogCommand {
+      - ProductId productId
+      String name
+      String catalogDescription
+      
+    }
+
+    Command UpdateCatalogItem extends @ProductCatalogCommand {
+      - CatalogItemId catalogItemId
+      String name
+      String productDescription
+    }
+
+    Command ActivateCatalogItem extends @ProductCatalogCommand {
+      - CatalogItemId catalogItemId
+    }
+
+    Command DeactivateCatalogItem extends @ProductCatalogCommand {
+      - CatalogItemId catalogItemId
+    }
+
+    Command RemoveCatalogItem extends @ProductCatalogCommand {
+      - CatalogItemId catalogItemId
+    }
+
+    // Events
+    abstract DomainEvent ProductCatalogEvent extends EventBase {
+      databaseTable = "product_catalog_events"
+      - ProductCatalogId catalogId
+    }
+
+    DomainEvent CatalogItemAdded extends @ProductCatalogEvent {
+      - CatalogItemId catalogItemId
+      String name
+      String productDescription
+    }
+
+    DomainEvent CatalogItemUpdated extends @ProductCatalogEvent {
+      - CatalogItemId catalogItemId
+      String name
+      String productDescription
+    }
+
+    DomainEvent CatalogItemActivated extends @ProductCatalogEvent {
+      - CatalogItemId catalogItemId
+    }
+
+    DomainEvent CatalogItemDeactivated extends @ProductCatalogEvent {
+      - CatalogItemId catalogItemId
+    }
+
+    DomainEvent CatalogItemRemoved extends @ProductCatalogEvent {
+      - CatalogItemId catalogItemId
+    }
+  }
+
+  Aggregate ProductCatalogReadModel {
+    Entity ProductReadModel {
+      String registryProductName
+      String registryProductDescription
+      String catalogProductName
+      String catalogProductDescription
+      - Price price
+    }
+
+    Entity CatalogView {
+      databaseTable = "catalog_views"
+      - ProductCatalogId catalogId
+      Timestamp lastUpdated
+      - List<ProductReadModel> products
+    }
+
+    // Resources
+    Resource ProductCatalogReadResource {
+      public @ProductCatalogDTO getCatalog(@ProductCatalogId catalogId) GET path="/catalogs/{catalogId}";
+      public @CatalogProductDTO getCatalogItem(@CatalogItemId catalogItemId) GET path="/catalogs/{catalogId}/items/{itemId}";
+      public List<@ProductCatalogDTO> getCatalogs() GET path="/catalogs";
+      public List<@CatalogProductDTO> getCatalogItems(@ProductCatalogId catalogId) GET path="/catalogs/{catalogId}/items";
+      public List<@CatalogProductDTO> getActiveCatalogItems(@ProductCatalogId catalogId) GET path="/catalogs/{catalogId}/items?status=active";
+    }
+
+    // Services
+    Service CatalogQueryConsumer {
+      public void handleQuery(@CatalogQuery qry);
+      public @ProductReadModel getCatalogItemById(@CatalogItemId catalogItemId);
+      public List<@ProductReadModel> getActiveCatalogItems(@ProductCatalogId catalogId);
+    }
+
+    Service CatalogQueryService {
+      public @ProductReadModel getCatalogItemById(@CatalogItemId catalogItemId);
+      public List<@ProductReadModel> getActiveCatalogItems(@ProductCatalogId catalogId);
+    }
+
+    // Data Transfer Objects
+    DataTransferObject CatalogProductDTO {
+      String registryProductName
+      String registryProductDescription
+      String catalogProductName
+      String catalogProductDescription
+      - Price price
+    }
+
+    DataTransferObject ProductCatalogDTO {
+      String catalogId
+      String label
+      String catalogDescription
+      Timestamp lastUpdated
+    }
+
+    // Queries
+    abstract Command CatalogQuery {
+    }
+
+    Command GetCatalogItemById extends @CatalogQuery {
+      - CatalogItemId productId
+    }
+
+    Command GetActiveCatalogItems extends @CatalogQuery {
+    }
+  }
+}
+
+// endregion Product Management
+
+// endregion Support
+
+// region Generic
+
+BoundedContext MoneyContext implements MoneyDomain {
+  type = FEATURE
+
+  Aggregate Money {
+    responsibilities = "Money"
+
+    ValueObject Price {
+      - Currency currency
+      double amount
+      def public Price add(@Price other);
+      def public Price subtract(@Price other);
+      def public Price multiply(double factor);
+    }
+
+    ValueObject Currency {
+      String code
+    }
+  }
+}
+
+// endregion Generic

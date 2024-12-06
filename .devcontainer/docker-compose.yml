@@ -1,0 +1,38 @@
+version: '3.9'
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sleep infinity
+    volumes:
+      - ..:/root/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - dev
+
+  # mongo:
+  #   image: mongo:latest
+  #   volumes:
+  #     - mongo-data:/data/db
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: root
+  #     MONGO_INITDB_ROOT_PASSWORD: root-pwd
+  #   networks:
+  #     - dev
+
+  # pulsar-standalone:
+  #   image: apachepulsar/pulsar:3.3.2
+  #   command: bin/pulsar standalone
+  #   volumes:
+  #     - ./pulsar/standalone.conf:/pulsar/conf/standalone.conf
+  #   environment:
+  #     PULSAR_MEM: -Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+  #   networks:
+  #     - dev
+
+# volumes:
+#   mongo-data:
+
+networks:
+  dev:

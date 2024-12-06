@@ -1,0 +1,47 @@
+plugins {
+    id 'java-library'
+    id 'jacoco'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation "org.mapstruct:mapstruct:${mapstructVersion}"
+
+    // MapStruct build-time annotation processor
+    annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+
+    testImplementation("${junitJupiterGroupId}:${junitJupiterArtifactId}:${junitJupiterVersion}")
+
+    testRuntimeOnly("${junitJupiterGroupId}:${junitJupiterArtifactId}-engine:${junitJupiterVersion}")
+}
+
+group 'org.ormi.priv.tfa.orderflow'
+version '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+test {
+    useJUnitPlatform()
+}
+
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+jacocoTestReport {
+    reports {
+        html.outputLocation = layout.buildDirectory.dir("jacocoHtml")
+    }
+}

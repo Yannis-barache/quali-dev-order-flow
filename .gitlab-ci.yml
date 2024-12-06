@@ -1,0 +1,56 @@
+stages:
+  - docker
+  - build
+
+variables:
+  NX_SOCKET_DIR: /tmp/nx-socket
+  GIT_DEPTH: 0
+  DOCKER_PATH: ./ci/docker/.
+  DOCKER_IMAGE: ${CI_REGISTRY_IMAGE}/quali-dev-order-flow-build:1124
+  DOCKER_DRIVER: overlay2
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+
+.distributed:
+  interruptible: true
+  cache:
+    key:
+      files:
+        - pnpm-lock.json
+    paths:
+      - .pnpm-store/
+      - .nx/
+  before_script:
+    - source $HOME/.sdkman/bin/sdkman-init.sh
+    - corepack enable
+    - corepack prepare pnpm@latest --activate
+    - pnpm config set store-dir .pnpm-store
+    - pnpm install --frozen-lockfile
+    - NX_HEAD=$CI_COMMIT_SHA
+    - NX_BASE=${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$CI_COMMIT_BEFORE_SHA}
+
+docker-prepare:
+  stage: docker
+  image: docker:24.0.5
+  services:
+    - name: docker:24.0.5-dind
+      alias: docker
+  interruptible: true
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker manifest inspect --insecure $DOCKER_IMAGE && (echo "Image already exists - no need to build" ; exit 0 ) || (docker build -t $DOCKER_IMAGE $DOCKER_PATH && docker push $DOCKER_IMAGE);
+
+pages:
+  extends: .distributed
+  stage: build
+  image: $DOCKER_IMAGE
+  script:
+    - pnpm nx run doc-material:build
+  artifacts:
+    paths:
+      # The folder that contains the files to be exposed at the Page URL
+      - public
+  rules:
+    # This ensures that only pushes to the default branch will trigger
+    # a pages deploy
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH

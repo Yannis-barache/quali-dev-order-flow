@@ -1,0 +1,59 @@
+plugins {
+    id 'java'
+    id 'io.quarkus'
+    id 'jacoco'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-messaging-pulsar'
+    implementation 'io.quarkus:quarkus-mongodb-panache'
+    implementation "org.mapstruct:mapstruct:${mapstructVersion}"
+    implementation project(':libs-event-sourcing')
+    implementation project(':libs-published-language')
+
+    // MapStruct build-time annotation processor
+    annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
+
+    testImplementation 'io.quarkus:quarkus-junit5'
+    testImplementation 'io.quarkus:quarkus-junit5-mockito'
+    testImplementation 'io.quarkus:quarkus-jacoco'
+
+    testImplementation("${junitJupiterGroupId}:${junitJupiterArtifactId}:${junitJupiterVersion}")
+    testImplementation("org.mockito:mockito-core:${mockitoVersion}")
+
+    testRuntimeOnly("${junitJupiterGroupId}:${junitJupiterArtifactId}-engine:${junitJupiterVersion}")
+}
+
+group 'org.ormi.priv.tfa.orderflow'
+version '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+test {
+    useJUnitPlatform()
+    systemProperty "java.util.logging.manager", "org.jboss.logmanager.LogManager"
+}
+compileJava {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-parameters'
+}
+
+compileTestJava {
+    options.encoding = 'UTF-8'
+}
+
+jacocoTestReport {
+    reports {
+        html.outputLocation = layout.buildDirectory.dir("jacocoHtml")
+    }
+}
