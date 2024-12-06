@@ -5,6 +5,41 @@ A comprehensive DDD, CQRS, event-driven application for customer's order and sto
 
 This application stack is designed for integrating into an ecosystem needing generic customer and order management.
 
+## Organisation
+
+### Version control
+
+This project is versioned using Git. The repository is hosted on GitHub.
+The repository is organized as a mono-repository, containing multiple packages.
+For development, the team uses feature branches and pull requests organisation based on the GitFlow workflow.
+This includes different branches for different environments:
+- `main` : the main branch, containing the latest stable version of the application
+- `develop` : the development branch, containing the latest development version of the application
+
+
+
+### Team 1 (Evann YANG, Khalil ABADA)
+
+This team handle the backend of the application and the API gateway.
+
+- Order Processing Service
+- Design, implement, and maintain the backend microservices responsible for processing orders.
+- Ensure the proper functioning of APIs for order creation, updates, and lifecycle tracking.
+
+This team is responsible for the functional and technical services of the application.
+They must be sure to provide a robust and reliable backend for the frontend team to consume.
+
+### Team 2 (Yannis BARACHE)
+
+This team handle the frontend of the application.
+
+-	Build and maintain the user interface for customers and administrators.
+- Ensure the proper functioning of the user interface for order creation, updates, and lifecycle tracking.
+- Ensure the proper functioning of the user interface for stock management.
+
+This team is responsible for the user experience and the user interface of the application.
+They must be sure to provide a user-friendly and reliable frontend for the customers and administrators.
+
 ## Installation
 
 ### Dev environment
