@@ -105,10 +105,11 @@ public class ProductRegistry {
             updated.payload.name,
             updated.payload.productDescription);
       });
+    } else if (event instanceof ProductRegistryError error) {
+      Log.error("Error event: " + error.getMessage());
     } else {
       Log.warn("Unhandled event type: " + event.getClass().getName());
     }
-  }
 
   /**
    * Increment the version of the registry.
