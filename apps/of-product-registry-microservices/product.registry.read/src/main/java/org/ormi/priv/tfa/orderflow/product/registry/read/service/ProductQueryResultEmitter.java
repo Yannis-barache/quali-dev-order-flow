@@ -7,11 +7,10 @@ import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.query.ProductRegistryQuery.ProductRegistryQueryResult;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.query.config.ProductRegistryQueryChannelName;
-// Import of the ProducerCloseException class from the product.registry service
-import org.ormi.priv.tfa.orderflow.product.registry.service.producer.ProducerCloseException;
-// Import of the ProducerCreationException class from the product.registry service
-import org.ormi.priv.tfa.orderflow.product.registry.service.producer.ProducerCreationException;
 
+// Import of the ProducerCloseException class from the product.registry service
+import org.ormi.priv.tfa.orderflow.product.registry.service.exceptions.ProducerCreationException;
+import org.ormi.priv.tfa.orderflow.product.registry.service.exceptions.ProducerCloseException;
 
 import io.quarkus.logging.Log;
 import io.smallrye.reactive.messaging.pulsar.PulsarClientService;
@@ -43,7 +42,11 @@ public class ProductQueryResultEmitter {
                   producer.flush();
                   producer.close();
                 } catch (PulsarClientException e) {
-                  throw new ProducerCloseException("Failed to close producer", e);
+                  try {
+                    throw new ProducerCloseException("Failed to close producer", e);
+                  } catch (ProducerCloseException exc) {
+                    throw new RuntimeException(exc);
+                  }
                 }
               });
         });
