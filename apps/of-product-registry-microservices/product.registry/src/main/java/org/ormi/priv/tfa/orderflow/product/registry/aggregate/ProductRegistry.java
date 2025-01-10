@@ -13,6 +13,7 @@ import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRemoved;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductUpdated;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.valueobject.ProductId;
 import org.ormi.priv.tfa.orderflow.product.registry.aggregate.service.ProductRegistryService;
+import org.ormi.priv.tfa.orderflow.product.registry.aggregate.ProductRegistryError;
 
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Uni;
@@ -82,9 +83,9 @@ public class ProductRegistry {
 
   /**
    * Apply an event.
-   * 
+   *
    * Thread safe. Should not persist any state changes.
-   * 
+   *
    * @param event the event to apply
    */
   public void apply(ProductRegistryEvent event) {
@@ -110,6 +111,7 @@ public class ProductRegistry {
     } else {
       Log.warn("Unhandled event type: " + event.getClass().getName());
     }
+  }
 
   /**
    * Increment the version of the registry.
