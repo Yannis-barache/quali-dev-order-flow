@@ -111,6 +111,7 @@ public class ProductRegistry {
     } else {
       Log.warn("Unhandled event type: " + event.getClass().getName());
     }
+  }
 
   /**
    * Increment the version of the registry.
