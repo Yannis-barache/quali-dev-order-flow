@@ -104,3 +104,18 @@ public interface ProductRegistryEventEntityMapper {
   @Mapping(target = "payload", source = "payload", qualifiedByName = "productRemovedEventPayloadToEvent")
   ProductRemoved toEvent(ProductRemovedEventEntity entity);
 }
+
+/**
+ * Maps a ProductRegistryError to a ProductRegistryErrorEntity.
+ *
+ * @param error the ProductRegistryError
+ * @return the mapped ProductRegistryErrorEntity
+ */
+@Mapping(target = "id", ignore = true)
+@Mapping(target = "eventId", source = "id", qualifiedByName = "eventIdToString")
+@Mapping(target = "eventType", source = "eventType")
+@Mapping(target = "aggregateRootId", source = "aggregateId")
+@Mapping(target = "version", source = "version")
+@Mapping(target = "timestamp", source = "timestamp")
+@Mapping(target = "payload", source = "message")
+ProductRegistryErrorEntity toEntity(ProductRegistryError error);
