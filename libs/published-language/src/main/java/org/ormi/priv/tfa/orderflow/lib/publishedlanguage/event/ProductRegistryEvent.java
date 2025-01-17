@@ -16,5 +16,5 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = ProductUpdated.class, name = "ProductUpdated"),
     @JsonSubTypes.Type(value = ProductRemoved.class, name = "ProductRemoved")
 })
-public sealed interface ProductRegistryEvent permits ProductRegistered, ProductRemoved, ProductUpdated {
+public sealed interface ProductRegistryEvent extends ProductRegistryMessage permits ProductRegistered, ProductRemoved, ProductUpdated {
 }
