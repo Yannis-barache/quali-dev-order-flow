@@ -28,9 +28,11 @@ import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.RemoveProduct;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.UpdateProduct;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistered;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryEvent;
+import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryMessage;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRemoved;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductUpdated;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.config.ProductRegistryEventChannelName;
+import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryError;
 
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Multi;
@@ -104,7 +106,7 @@ public class ProductRegistryCommandResource {
     // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
       // Create consumer for product registry events with the given correlation id
-      final Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId); // METTRE MESSAGE COMME TYPE ICI
+      final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
       // Close the consumer on termination
       em.onTermination(() -> {
         try {
@@ -124,16 +126,23 @@ public class ProductRegistryCommandResource {
               Log.debug("No event received within timeout of " + timeout + " seconds.");
               em.complete();
             }
-            final ProductRegistryEvent evt = msg.get().getValue();
-            Log.debug("Received event: " + evt); // AJOUTER DES IF POUR GERER AVEC LES ERRORS 
+            final ProductRegistryMessage registryMsg = msg.get().getValue();
+            Log.debug("Received event: " + registryMsg);
+
+            if (registryMsg instanceof ProductRegistryError){
+              Throwable error = new ProductRegistryError();
+              em.fail(error);
+              return;
+            }
+
             // Map event to DTO
-            if (evt instanceof ProductRegistered registered) {
+            if (registryMsg instanceof ProductRegistered registered) {
               Log.debug("Emitting DTO for registered event: " + registered);
               // Emit DTO for registered event
               em.emit(ProductRegistryEventDtoMapper.INSTANCE.toDto(registered));
             } else {
               // Fail the stream on unexpected event types
-              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + evt.getClass().getName());
+              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + registryMsg.getClass().getName());
               em.fail(error);
               return;
             }
@@ -189,7 +198,7 @@ public class ProductRegistryCommandResource {
     // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
       // Create consumer for product registry events with the given correlation id
-      final Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId);
+      final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
       // Close the consumer on termination
       em.onTermination(() -> {
         try {
@@ -209,16 +218,23 @@ public class ProductRegistryCommandResource {
               Log.debug("No event received within timeout of " + timeout + " seconds.");
               em.complete();
             }
-            final ProductRegistryEvent evt = msg.get().getValue();
-            Log.debug("Received event: " + evt);
+            final ProductRegistryMessage registryMsg = msg.get().getValue();
+            Log.debug("Received event: " + registryMsg);
+
+            if (registryMsg instanceof ProductRegistryError){
+              Throwable error = new ProductRegistryError();
+              em.fail(error);
+              return;
+            }
+
             // Map event to DTO
-            if (evt instanceof ProductUpdated updated) {
+            if (registryMsg instanceof ProductUpdated updated) {
               Log.debug("Emitting DTO for updated event: " + updated);
               // Emit DTO for updated event
               em.emit(ProductRegistryEventDtoMapper.INSTANCE.toDto(updated));
             } else {
               // Fail the stream on unexpected event types
-              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + evt.getClass().getName());
+              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + registryMsg.getClass().getName());
               em.fail(error);
               return;
             }
@@ -268,7 +284,7 @@ public class ProductRegistryCommandResource {
     // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
       // Create consumer for product registry events with the given correlation id
-      final Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId);
+      final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
       // Close the consumer on termination
       em.onTermination(() -> {
         try {
@@ -288,16 +304,23 @@ public class ProductRegistryCommandResource {
               Log.debug("No event received within timeout of " + timeout + " seconds.");
               em.complete();
             }
-            final ProductRegistryEvent evt = msg.get().getValue();
-            Log.debug("Received event: " + evt);
+            final ProductRegistryMessage registryMsg = msg.get().getValue();
+            Log.debug("Received event: " + registryMsg);
+
+            if (registryMsg instanceof ProductRegistryError){
+              Throwable error = new ProductRegistryError();
+              em.fail(error);
+              return;
+            }
+
             // Map event to DTO
-            if (evt instanceof ProductRemoved removed) {
+            if (registryMsg instanceof ProductRemoved removed) {
               Log.debug("Emitting DTO for removed event: " + removed);
               // Emit DTO for removed event
               em.emit(ProductRegistryEventDtoMapper.INSTANCE.toDto(removed));
             } else {
               // Fail the stream on unexpected event types
-              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + evt.getClass().getName());
+              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + registryMsg.getClass().getName());
               em.fail(error);
               return;
             }
@@ -323,14 +346,14 @@ public class ProductRegistryCommandResource {
    * @param correlationId - correlation id to use for the consumer
    * @return Consumer for product registry events
    */
-  private Consumer<ProductRegistryEvent> getEventsConsumerByCorrelationId(String correlationId) {
+  private Consumer<ProductRegistryMessage> getEventsConsumerByCorrelationId(String correlationId) {
     try {
       // Define the channel name, topic and schema for the consumer
-      final String channelName = ProductRegistryEventChannelName.PRODUCT_REGISTRY_EVENT.toString();
+      final String channelName = ProductRegistryEventChannelName.PRODUCT_REGISTRY_EVENT_MESSAGE.toString();
       final String topic = channelName + "-" + correlationId;
       // Create and return the subscription (consumer)
       return pulsarClients.getClient(channelName)
-          .newConsumer(Schema.JSON(ProductRegistryEvent.class))
+          .newConsumer(Schema.JSON(ProductRegistryMessage.class))
           .subscriptionName(topic)
           .topic(topic)
           .subscribe();
