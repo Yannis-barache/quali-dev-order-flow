@@ -9,9 +9,17 @@ repositories {
 }
 
 dependencies {
-    implementation "com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}"
+    implementation enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")
+    implementation 'io.quarkus:quarkus-arc'
+    implementation 'io.quarkus:quarkus-rest-jackson'
+    implementation 'io.quarkus:quarkus-hibernate-validator'
+    implementation 'io.quarkus:quarkus-messaging-pulsar'
     implementation "org.mapstruct:mapstruct:${mapstructVersion}"
-    api project(':libs-event-sourcing')
+    implementation project(':libs-event-sourcing')
+    implementation project(':libs-published-language')
+
+    // SmallRye OpenAPI
+    implementation 'io.quarkus:quarkus-smallrye-openapi'
 
     // MapStruct build-time annotation processor
     annotationProcessor "org.mapstruct:mapstruct-processor:${mapstructVersion}"
