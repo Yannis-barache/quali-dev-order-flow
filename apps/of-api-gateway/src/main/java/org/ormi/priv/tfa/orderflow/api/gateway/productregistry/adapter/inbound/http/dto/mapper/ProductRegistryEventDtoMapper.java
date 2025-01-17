@@ -39,4 +39,7 @@ public interface ProductRegistryEventDtoMapper {
   @Mapping(target = "eventType", source = "eventType")
   @Mapping(target = "payload", source = "payload",  qualifiedByName = "productRemovedPayloadToDto")
   ProductRemovedEventDto toDto(ProductRemoved evt);
+
+  @Mapping(target = "errorMessage", source = "errorMessage")
+  ProductRegistryErrorDto toDto(ProductRegisteryError error);
 }
