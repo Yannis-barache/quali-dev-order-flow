@@ -104,7 +104,7 @@ public class ProductRegistryCommandResource {
     // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
       // Create consumer for product registry events with the given correlation id
-      final Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId);
+      final Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId); // METTRE MESSAGE COMME TYPE ICI
       // Close the consumer on termination
       em.onTermination(() -> {
         try {
@@ -125,7 +125,7 @@ public class ProductRegistryCommandResource {
               em.complete();
             }
             final ProductRegistryEvent evt = msg.get().getValue();
-            Log.debug("Received event: " + evt);
+            Log.debug("Received event: " + evt); // AJOUTER DES IF POUR GERER AVEC LES ERRORS 
             // Map event to DTO
             if (evt instanceof ProductRegistered registered) {
               Log.debug("Emitting DTO for registered event: " + registered);
