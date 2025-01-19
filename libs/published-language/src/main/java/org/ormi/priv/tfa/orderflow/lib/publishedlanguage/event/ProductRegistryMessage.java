@@ -16,6 +16,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
     @JsonSubTypes.Type(value = ProductRegistryEvent.class, name = "ProductRegistryEvent"),
 })
 
+
 public sealed interface ProductRegistryMessage permits ProductRegisteryError, ProductRegistryError,
     ProductRegistryEvent {
 }
