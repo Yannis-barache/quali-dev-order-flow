@@ -317,15 +317,15 @@ public class ProductRegistryCommandResource {
       }
       
       final ProductRegistryMessage registryMsg = msg.get().getValue();
-            Log.debug("Received event: " + registryMsg);
+      Log.debug("Received event: " + registryMsg);
 
-            if (registryMsg instanceof ProductRegistryError){
-              Throwable error = new ProductRegistryError();
-              em.fail(error);
-              return;
-            }
-      
+      if (registryMsg instanceof ProductRegistryError){
+        Throwable error = new ProductRegistryError();
+        em.fail(error);
+        return;
+      }
 
+      ProductRegistryEvent registryMessage = (ProductRegistryEvent) registryMsg;
       // Mapper l'événement à un DTO
       T dto = eventMapper.apply(registryMessage);
       if (dto != null) {
