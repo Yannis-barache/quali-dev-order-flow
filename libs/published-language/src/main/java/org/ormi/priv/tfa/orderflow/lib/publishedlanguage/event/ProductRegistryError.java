@@ -1,6 +1,5 @@
+
 package org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event;
-
-
 /**
  * ProductRegistryError
  * 

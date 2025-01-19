@@ -6,14 +6,17 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import io.smallrye.mutiny.subscription.MultiEmitter;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.api.Schema;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.reactive.messaging.Channel;
 import org.eclipse.microprofile.reactive.messaging.Emitter;
 import org.eclipse.microprofile.reactive.messaging.Message;
 import org.jboss.resteasy.reactive.RestStreamElementType;
 import org.ormi.priv.tfa.orderflow.api.gateway.productregistry.adapter.inbound.http.dto.ProductRegisteredEventDto;
+import org.ormi.priv.tfa.orderflow.api.gateway.productregistry.adapter.inbound.http.dto.ProductRegistryEventDto;
 import org.ormi.priv.tfa.orderflow.api.gateway.productregistry.adapter.inbound.http.dto.ProductRemovedEventDto;
 import org.ormi.priv.tfa.orderflow.api.gateway.productregistry.adapter.inbound.http.dto.ProductUpdatedEventDto;
 import org.ormi.priv.tfa.orderflow.api.gateway.productregistry.adapter.inbound.http.dto.RegisterProductCommandDto;
@@ -50,6 +53,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 
+
+
 @Path("/product/registry")
 public class ProductRegistryCommandResource {
 
@@ -60,6 +65,12 @@ public class ProductRegistryCommandResource {
   PulsarClientService pulsarClients;
 
   /**
+   * Timeout of the events
+   */
+  @ConfigProperty(name = "product.registry.stream.timeout")
+  int timeout;
+
+  /**
    * Static emitter for sending product registry commands.
    */
   @Inject
@@ -68,7 +79,7 @@ public class ProductRegistryCommandResource {
 
   /**
    * Endpoint to register a product.
-   * 
+   *
    * @param cmdDto - DTO containing the product details
    * @return Response indicating the product registration was accepted
    */
@@ -95,7 +106,7 @@ public class ProductRegistryCommandResource {
 
   /**
    * Endpoint to stream product registry registered events.
-   * 
+   *
    * @param correlationId - correlation id to use for the consumer
    * @return Multi of product registry events
    */
@@ -103,8 +114,8 @@ public class ProductRegistryCommandResource {
   @Path("/events/productRegistered")
   @RestStreamElementType(MediaType.APPLICATION_JSON)
   public Multi<ProductRegisteredEventDto> registeredEventStream(@QueryParam("correlationId") String correlationId) {
-    // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
+
       // Create consumer for product registry events with the given correlation id
       final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
       // Close the consumer on termination
@@ -115,44 +126,21 @@ public class ProductRegistryCommandResource {
           Log.error("Failed to close consumer for product registry events.", e);
         }
       });
-      // Consume events and emit DTOs
+
       CompletableFuture.runAsync(() -> {
-        while(!em.isCancelled()) {
-          try {
-            final var timeout = 10000;
-            final var msg = Optional.ofNullable(consumer.receive(timeout, TimeUnit.MILLISECONDS));
-            if (msg.isEmpty()) {
-              // Complete the emitter if no event is received within the timeout. Free up resources.
-              Log.debug("No event received within timeout of " + timeout + " seconds.");
-              em.complete();
-            }
-            final ProductRegistryMessage registryMsg = msg.get().getValue();
-            Log.debug("Received event: " + registryMsg);
 
-            if (registryMsg instanceof ProductRegistryError){
-              Throwable error = new ProductRegistryError();
-              em.fail(error);
-              return;
-            }
-
-            // Map event to DTO
-            if (registryMsg instanceof ProductRegistered registered) {
-              Log.debug("Emitting DTO for registered event: " + registered);
-              // Emit DTO for registered event
-              em.emit(ProductRegistryEventDtoMapper.INSTANCE.toDto(registered));
-            } else {
-              // Fail the stream on unexpected event types
-              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + registryMsg.getClass().getName());
-              em.fail(error);
-              return;
-            }
-            // Acknowledge the message
-            consumer.acknowledge(msg.get());
-          } catch (PulsarClientException e) {
-            Log.error("Failed to receive event from consumer.", e);
-            em.fail(e);
-            return;
-          }
+        while (!em.isCancelled()) {
+          processEvent(
+              consumer,
+              timeout,
+              em,
+              evt -> {
+                if (evt instanceof ProductRegistered registered) {
+                  return ProductRegistryEventDtoMapper.INSTANCE.toDto(registered);
+                }
+                return null; // Événement inattendu
+              }
+          );
         }
       });
     });
@@ -160,7 +148,7 @@ public class ProductRegistryCommandResource {
 
   /**
    * Endpoint to update a product.
-   * 
+   *
    * @param updateProduct - DTO containing the product details
    * @param uriInfo       - URI info for building the response URI
    * @return Response indicating the product update was accepted
@@ -187,7 +175,7 @@ public class ProductRegistryCommandResource {
 
   /**
    * Endpoint to stream product registry updated events.
-   * 
+   *
    * @param correlationId - correlation id to use for the consumer
    * @return Multi of product registry events
    */
@@ -195,7 +183,6 @@ public class ProductRegistryCommandResource {
   @Path("/events/productUpdated")
   @RestStreamElementType(MediaType.APPLICATION_JSON)
   public Multi<ProductUpdatedEventDto> updatedEventStream(@QueryParam("correlationId") String correlationId) {
-    // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
       // Create consumer for product registry events with the given correlation id
       final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
@@ -207,44 +194,20 @@ public class ProductRegistryCommandResource {
           Log.error("Failed to close consumer for product registry events.", e);
         }
       });
-      // Consume events and emit DTOs
+
       CompletableFuture.runAsync(() -> {
-        while(!em.isCancelled()) {
-          try {
-            final var timeout = 10000;
-            final var msg = Optional.ofNullable(consumer.receive(timeout, TimeUnit.MILLISECONDS));
-            if (msg.isEmpty()) {
-              // Complete the emitter if no event is received within the timeout. Free up resources.
-              Log.debug("No event received within timeout of " + timeout + " seconds.");
-              em.complete();
-            }
-            final ProductRegistryMessage registryMsg = msg.get().getValue();
-            Log.debug("Received event: " + registryMsg);
-
-            if (registryMsg instanceof ProductRegistryError){
-              Throwable error = new ProductRegistryError();
-              em.fail(error);
-              return;
-            }
-
-            // Map event to DTO
-            if (registryMsg instanceof ProductUpdated updated) {
-              Log.debug("Emitting DTO for updated event: " + updated);
-              // Emit DTO for updated event
-              em.emit(ProductRegistryEventDtoMapper.INSTANCE.toDto(updated));
-            } else {
-              // Fail the stream on unexpected event types
-              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + registryMsg.getClass().getName());
-              em.fail(error);
-              return;
-            }
-            // Acknowledge the message
-            consumer.acknowledge(msg.get());
-          } catch (PulsarClientException e) {
-            Log.error("Failed to receive event from consumer.", e);
-            em.fail(e);
-            return;
-          }
+        while (!em.isCancelled()) {
+          processEvent(
+              consumer,
+              timeout,
+              em,
+              evt -> {
+                if (evt instanceof ProductUpdated updated) {
+                  return ProductRegistryEventDtoMapper.INSTANCE.toDto(updated);
+                }
+                return null; // Événement inattendu
+              }
+          );
         }
       });
     });
@@ -252,7 +215,7 @@ public class ProductRegistryCommandResource {
 
   /**
    * Endpoint to remove a product.
-   * 
+   *
    * @param removeProduct - DTO containing the product details
    * @param uriInfo       - URI info for building the response URI
    * @return Response indicating the product removal was accepted
@@ -281,8 +244,8 @@ public class ProductRegistryCommandResource {
   @Path("/events/productRemoved")
   @RestStreamElementType(MediaType.APPLICATION_JSON)
   public Multi<ProductRemovedEventDto> removedEventStream(@QueryParam("correlationId") String correlationId) {
-    // Create a stream of product registry events
     return Multi.createFrom().emitter(em -> {
+
       // Create consumer for product registry events with the given correlation id
       final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
       // Close the consumer on termination
@@ -293,56 +256,30 @@ public class ProductRegistryCommandResource {
           Log.error("Failed to close consumer for product registry events.", e);
         }
       });
-      // Consume events and emit DTOs
+
       CompletableFuture.runAsync(() -> {
-        while(!em.isCancelled()) {
-          try {
-            final var timeout = 10000;
-            final var msg = Optional.ofNullable(consumer.receive(timeout, TimeUnit.MILLISECONDS));
-            if (msg.isEmpty()) {
-              // Complete the emitter if no event is received within the timeout. Free up resources.
-              Log.debug("No event received within timeout of " + timeout + " seconds.");
-              em.complete();
-            }
-            final ProductRegistryMessage registryMsg = msg.get().getValue();
-            Log.debug("Received event: " + registryMsg);
-
-            if (registryMsg instanceof ProductRegistryError){
-              Throwable error = new ProductRegistryError();
-              em.fail(error);
-              return;
-            }
-
-            // Map event to DTO
-            if (registryMsg instanceof ProductRemoved removed) {
-              Log.debug("Emitting DTO for removed event: " + removed);
-              // Emit DTO for removed event
-              em.emit(ProductRegistryEventDtoMapper.INSTANCE.toDto(removed));
-            } else {
-              // Fail the stream on unexpected event types
-              Throwable error = new ProductRegistryEventStreamException("Unexpected event type: " + registryMsg.getClass().getName());
-              em.fail(error);
-              return;
-            }
-            // Acknowledge the message
-            consumer.acknowledge(msg.get());
-          } catch (PulsarClientException e) {
-            Log.error("Failed to receive event from consumer.", e);
-            em.fail(e);
-            return;
-          }
+        while (!em.isCancelled()) {
+          processEvent(
+              consumer,
+              timeout,
+              em,
+              evt -> {
+                if (evt instanceof ProductRemoved removed) {
+                  return ProductRegistryEventDtoMapper.INSTANCE.toDto(removed);
+                }
+                return null; // Événement inattendu
+              }
+          );
         }
       });
     });
   }
-
   /**
    * Create a consumer for product registry events with the given correlation id.
-   * 
    * Useful for consuming events with a specific correlation id to avoid consuming
    * events from other
    * producers.
-   * 
+   *
    * @param correlationId - correlation id to use for the consumer
    * @return Consumer for product registry events
    */
@@ -359,6 +296,55 @@ public class ProductRegistryCommandResource {
           .subscribe();
     } catch (PulsarClientException e) {
       throw new PublicRegistryEventStreamException("Failed to create consumer for product registry events.", e);
+    }
+  }
+
+  public static <T extends ProductRegistryEventDto> void processEvent(
+      Consumer<ProductRegistryMessage> consumer,
+      long timeout,
+      MultiEmitter<? super T> em,
+      java.util.function.Function<ProductRegistryEvent, T> eventMapper
+  ) {
+    try {
+      // Recevoir un message du consommateur avec un délai d'attente
+      final var msg = Optional.ofNullable(consumer.receive((int) timeout, TimeUnit.MILLISECONDS));
+
+      if (msg.isEmpty()) {
+        // Aucun événement reçu, compléter l'émetteur
+        Log.debug("No event received within timeout of " + timeout + " seconds.");
+        em.complete();
+        return;
+      }
+      
+      final ProductRegistryMessage registryMsg = msg.get().getValue();
+            Log.debug("Received event: " + registryMsg);
+
+            if (registryMsg instanceof ProductRegistryError){
+              Throwable error = new ProductRegistryError();
+              em.fail(error);
+              return;
+            }
+      
+
+      // Mapper l'événement à un DTO
+      T dto = eventMapper.apply(registryMessage);
+      if (dto != null) {
+        Log.debug("Emitting DTO: " + dto);
+        em.emit(dto);
+      } else {
+        // Type d'événement inattendu, échec de la diffusion
+        Throwable error = new ProductRegistryEventStreamException(
+            "Unexpected event type: " + registryMessage.getClass().getName()
+        );
+        em.fail(error);
+        return;
+      }
+
+      // Accuser réception du message
+      consumer.acknowledge(msg.get());
+    } catch (PulsarClientException e) {
+      Log.error("Failed to receive event from consumer.", e);
+      em.fail(e);
     }
   }
 }
