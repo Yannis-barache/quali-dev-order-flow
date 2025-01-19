@@ -31,9 +31,11 @@ import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.RemoveProduct;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.UpdateProduct;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistered;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryEvent;
+import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryMessage;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRemoved;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductUpdated;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.config.ProductRegistryEventChannelName;
+import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryError;
 
 import io.quarkus.logging.Log;
 import io.smallrye.mutiny.Multi;
@@ -113,8 +115,10 @@ public class ProductRegistryCommandResource {
   @RestStreamElementType(MediaType.APPLICATION_JSON)
   public Multi<ProductRegisteredEventDto> registeredEventStream(@QueryParam("correlationId") String correlationId) {
     return Multi.createFrom().emitter(em -> {
-      Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId);
 
+      // Create consumer for product registry events with the given correlation id
+      final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
+      // Close the consumer on termination
       em.onTermination(() -> {
         try {
           consumer.unsubscribe();
@@ -124,6 +128,7 @@ public class ProductRegistryCommandResource {
       });
 
       CompletableFuture.runAsync(() -> {
+
         while (!em.isCancelled()) {
           processEvent(
               consumer,
@@ -179,8 +184,9 @@ public class ProductRegistryCommandResource {
   @RestStreamElementType(MediaType.APPLICATION_JSON)
   public Multi<ProductUpdatedEventDto> updatedEventStream(@QueryParam("correlationId") String correlationId) {
     return Multi.createFrom().emitter(em -> {
-      Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId);
-
+      // Create consumer for product registry events with the given correlation id
+      final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
+      // Close the consumer on termination
       em.onTermination(() -> {
         try {
           consumer.unsubscribe();
@@ -239,8 +245,10 @@ public class ProductRegistryCommandResource {
   @RestStreamElementType(MediaType.APPLICATION_JSON)
   public Multi<ProductRemovedEventDto> removedEventStream(@QueryParam("correlationId") String correlationId) {
     return Multi.createFrom().emitter(em -> {
-      Consumer<ProductRegistryEvent> consumer = getEventsConsumerByCorrelationId(correlationId);
 
+      // Create consumer for product registry events with the given correlation id
+      final Consumer<ProductRegistryMessage> consumer = getEventsConsumerByCorrelationId(correlationId);
+      // Close the consumer on termination
       em.onTermination(() -> {
         try {
           consumer.unsubscribe();
@@ -275,14 +283,14 @@ public class ProductRegistryCommandResource {
    * @param correlationId - correlation id to use for the consumer
    * @return Consumer for product registry events
    */
-  private Consumer<ProductRegistryEvent> getEventsConsumerByCorrelationId(String correlationId) {
+  private Consumer<ProductRegistryMessage> getEventsConsumerByCorrelationId(String correlationId) {
     try {
       // Define the channel name, topic and schema for the consumer
-      final String channelName = ProductRegistryEventChannelName.PRODUCT_REGISTRY_EVENT.toString();
+      final String channelName = ProductRegistryEventChannelName.PRODUCT_REGISTRY_EVENT_MESSAGE.toString();
       final String topic = channelName + "-" + correlationId;
       // Create and return the subscription (consumer)
       return pulsarClients.getClient(channelName)
-          .newConsumer(Schema.JSON(ProductRegistryEvent.class))
+          .newConsumer(Schema.JSON(ProductRegistryMessage.class))
           .subscriptionName(topic)
           .topic(topic)
           .subscribe();
@@ -292,7 +300,7 @@ public class ProductRegistryCommandResource {
   }
 
   public static <T extends ProductRegistryEventDto> void processEvent(
-      Consumer<ProductRegistryEvent> consumer,
+      Consumer<ProductRegistryMessage> consumer,
       long timeout,
       MultiEmitter<? super T> em,
       java.util.function.Function<ProductRegistryEvent, T> eventMapper
@@ -307,19 +315,26 @@ public class ProductRegistryCommandResource {
         em.complete();
         return;
       }
+      
+      final ProductRegistryMessage registryMsg = msg.get().getValue();
+            Log.debug("Received event: " + registryMsg);
 
-      final ProductRegistryEvent evt = msg.get().getValue();
-      Log.debug("Received event: " + evt);
+            if (registryMsg instanceof ProductRegistryError){
+              Throwable error = new ProductRegistryError();
+              em.fail(error);
+              return;
+            }
+      
 
       // Mapper l'événement à un DTO
-      T dto = eventMapper.apply(evt);
+      T dto = eventMapper.apply(registryMessage);
       if (dto != null) {
         Log.debug("Emitting DTO: " + dto);
         em.emit(dto);
       } else {
         // Type d'événement inattendu, échec de la diffusion
         Throwable error = new ProductRegistryEventStreamException(
-            "Unexpected event type: " + evt.getClass().getName()
+            "Unexpected event type: " + registryMessage.getClass().getName()
         );
         em.fail(error);
         return;
