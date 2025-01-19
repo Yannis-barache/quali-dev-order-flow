@@ -41,3 +41,7 @@ project(':libs-published-language').projectDir =
 include(':libs-event-sourcing')
 project(':libs-event-sourcing').projectDir =
   new File('libs/event-sourcing')
+
+include(':libs-shared')
+project(':libs-shared').projectDir =
+  new File('libs/shared')

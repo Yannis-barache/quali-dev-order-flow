@@ -8,6 +8,7 @@ import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.RegisterProduct
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.RemoveProduct;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.command.UpdateProduct;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistered;
+import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryError;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryEvent;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRemoved;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductUpdated;
@@ -82,12 +83,13 @@ public class ProductRegistry {
 
   /**
    * Apply an event.
-   * 
+   * <p>
    * Thread safe. Should not persist any state changes.
-   * 
+   *
    * @param event the event to apply
+   * @return
    */
-  public void apply(ProductRegistryEvent event) {
+  public long apply(ProductRegistryEvent event) {
     Log.debug("Applying event: " + event.getClass().getName());
     if (event instanceof ProductRegistered registered) {
       final ProductId productId = registered.payload.productId;

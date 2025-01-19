@@ -10,6 +10,7 @@ import org.ormi.priv.tfa.orderflow.lib.event.sourcing.aggregate.mapper.EventIdMa
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistered;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRemoved;
 import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductUpdated;
+import org.ormi.priv.tfa.orderflow.lib.publishedlanguage.event.ProductRegistryError;
 
 @Mapper(uses = {EventIdMapper.class, ProductRegistryEventPayloadMapper.class})
 public interface ProductRegistryEventDtoMapper {
